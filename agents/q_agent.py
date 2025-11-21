@@ -2,12 +2,13 @@ import numpy as np
 from collections import deque
 
 class QAgent:
-    def __init__(self, env, alpha=0.3, gamma=0.95, epsilon=0.2, use_reflection=True):
+    def __init__(self, env, alpha=0.3, gamma=0.95, epsilon=0.2, use_reflection=True, reflection_strategy=None):
         self.env = env
         self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
         self.use_reflection = use_reflection
+        self.reflection_strategy = reflection_strategy
 
         self.n_actions = 5 if use_reflection else 4
         self.Q = np.zeros((env.size, env.size, self.n_actions))
@@ -19,19 +20,6 @@ class QAgent:
         if np.random.rand() < self.epsilon:
             return np.random.randint(self.n_actions)
         return np.argmax(self.Q[x,y])
-
-    def reflect(self):
-        """Updates epsilon based on performance trend."""
-        if len(self.returns) < 10:
-            return
-
-        early = np.mean(list(self.returns)[:5])
-        late = np.mean(list(self.returns)[5:])
-
-        if late < early:
-            self.epsilon = min(1.0, self.epsilon + 0.02)
-        else:
-            self.epsilon = max(0.01, self.epsilon - 0.02)
 
     def train_episode(self):
         self.num_reflections_used = 0
@@ -53,7 +41,8 @@ class QAgent:
             )
 
             if self.use_reflection and action == self.env.ACTION_REFLECT:
-                self.reflect()
+                if self.reflection_strategy:
+                    self.reflection_strategy.reflect(self)
                 self.num_reflections_used += 1
 
             state = next_state
