@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from agents.reflection.epsilon_reflection import EpsilonReflection
-from env.gridworld import GridWorld
+from experiment.gridworld import GridWorld
 from agents.q_agent import QAgent
 from experiment.runner import run_experiment
 
