@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import random
 
 class GridWorld:
@@ -79,7 +80,7 @@ class GridWorld:
             self.grid[pos] = 1
             self.obstacles.append(pos)
 
-    def generate_environment(self, num_obstacles=3):
+    def generate_environment(self, num_obstacles=30):
         self.grid = np.zeros((self.size, self.size))
 
         if not self.set_agent_goal():
@@ -96,7 +97,6 @@ class GridWorld:
             self.generate_obstacles(max(0, num_obstacles - 1))
 
     # environment interaction methods
-
     def reset(self):
         """start a new episode. agent stays at original spawn."""
         return self.agent_pos
@@ -139,3 +139,29 @@ class GridWorld:
 
         # movement penalty
         return self.agent_pos, -0.1, False
+
+    # utility methods
+    def visualize_grid(self):
+        grid = np.zeros((self.size, self.size, 3))  # RGB grid
+
+        # Empty = white
+        grid[:] = [1, 1, 1]
+
+        # Obstacles = red
+        for ox, oy in self.obstacles:
+            grid[ox, oy] = [1, 0, 0]
+
+        # Goal = green
+        gx, gy = self.goal_pos
+        grid[gx, gy] = [0, 1, 0]
+
+        # Agent = blue
+        ax, ay = self.agent_pos
+        grid[ax, ay] = [0, 0, 1]
+
+        plt.imshow(grid)
+        plt.title("GridWorld")
+        plt.grid(True, color="black", linewidth=0.5)
+        plt.xticks(np.arange(-.5, self.size, 1))
+        plt.yticks(np.arange(-.5, self.size, 1))
+        plt.show()
