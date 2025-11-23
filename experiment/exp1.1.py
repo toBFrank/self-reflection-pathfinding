@@ -189,6 +189,7 @@ class QAgent:
         done = False
         total_reward = 0
         steps = 0  # 新增计数器
+        actions = []  # 新增：用于存储本episode中的动作序列
 
         while not done and steps < max_steps:  # ← 加入步数限制
             action = self.choose_action(state)
@@ -206,28 +207,33 @@ class QAgent:
                 self.num_reflections_used += 1
             else:
                 self.num_moves += 1
-
+            
+            actions.append(action)  # 新增：记录当前步骤采取的动作
             state = next_state
             steps += 1  # 每次循环都算一步（包括 reflection）
 
-
         self.returns.append(total_reward)
-        return total_reward, self.num_reflections_used, self.num_moves
+        return total_reward, self.num_reflections_used, self.num_moves, actions  # 修改：返回动作序列
+
 
 
 # experiment runner (modified to record reflection usage per episode)
+# 在run_experiment函数中记录每个episode的动作序列
 def run_experiment(env, agent, episodes=50000, max_steps=500):
     rewards = []
     reflect_counts = []
     move_steps = []
+    actions_per_episode = []  # 新增：用于存储每个episode的动作序列
+    
     for ep in range(episodes):
-        r, refl, moves = agent.train_episode(max_steps=max_steps)
+        r, refl, moves, actions = agent.train_episode(max_steps=max_steps)  # 修改：获取动作序列
         rewards.append(r)
         reflect_counts.append(refl)
         move_steps.append(moves)
+        actions_per_episode.append(actions)  # 新增：保存动作序列
         if refl > 0:
             print(f"Episode {ep} | Reward = {r:.2f} | Reflections = {refl} | Steps = {moves}")
-    return rewards, reflect_counts, move_steps
+    return rewards, reflect_counts, move_steps, actions_per_episode  # 修改：返回actions_per_episod
 
 # main experiment
 
@@ -238,12 +244,12 @@ env.generate_environment(num_obstacles=20)
 # baseline (NO reflection)
 print("NO REFLECTION")
 baseline_agent = QAgent(env, use_reflection=False)
-baseline_rewards, _, baseline_moves = run_experiment(env, baseline_agent, episodes=500, max_steps=50000)
+baseline_rewards, _, baseline_moves, baseline_actions = run_experiment(env, baseline_agent, episodes=500, max_steps=50000)
 
 # reflective agent
 print("\nWITH REFLECTION")
 reflect_agent = QAgent(env, use_reflection=True)
-reflect_rewards, reflect_counts, reflect_moves = run_experiment(env, reflect_agent, episodes=500, max_steps=50000)
+reflect_rewards, reflect_counts, reflect_moves, reflect_actions = run_experiment(env, reflect_agent, episodes=500, max_steps=50000)
 
 import matplotlib.pyplot as plt
 
@@ -299,5 +305,28 @@ axes[2].legend()
 axes[2].grid(alpha=0.3)
 
 # 自动调整布局，避免重叠
+plt.tight_layout()
+plt.show()
+
+selected_episodes = [99, 299, 499]
+fig, axes = plt.subplots(len(selected_episodes), 1, figsize=(12, 10), sharex=True)
+
+for idx, episode_idx in enumerate(selected_episodes):
+    actions = reflect_actions[episode_idx]  # 使用有反思机制的数据
+        
+    axes[idx].plot(actions, label=f'Episode {episode_idx}', alpha=0.8)
+        
+    # 找到反思行为的步数（这里假设ACTION_REFLECT是反思行为）
+    reflect_steps = [i for i, action in enumerate(actions) if action == GridWorld.ACTION_REFLECT]
+    reflect_values = [actions[i] for i in reflect_steps]
+
+    axes[idx].scatter(reflect_steps, reflect_values, color='red', label='Reflection Action', zorder=5)
+    
+    axes[idx].set_ylabel('Action')
+    axes[idx].set_title(f'Step-wise Actions for Episode {episode_idx}')
+    axes[idx].legend()
+    axes[idx].grid(alpha=0.3)
+
+plt.xlabel('Step')
 plt.tight_layout()
 plt.show()
