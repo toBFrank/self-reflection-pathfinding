@@ -3,8 +3,22 @@ from collections import deque
 
 class QAgent:
     def __init__(self, env, alpha=0.3, gamma=0.95, epsilon=0.2, use_reflection=True, reflection_strategy=None):
+        """
+        Q-Learning agent that can self-reflect.
+
+        Reflection is a special action that agent can optionally choose to take.
+        When reflecting, it uses a reflection strategy that changes the agent's internal parameters (e.g., epsilon).
+
+        Args:
+            env: The environment the agent is put in (gridworld).
+            alpha: Q-learning rate (high = trust new information more, low = trust old information more).
+            gamma: Discount factor (high = future rewards more valuable, low = immediate rewards more valuable).
+            epsilon: Exploration rate (high = more random moves, low = less random moves).
+            use_reflection: Whether to enable reflection action.
+            reflection_strategy: An instance of a ReflectionStrategy to use when reflecting.
+        """
         self.env = env
-        self.alpha = alpha
+        self.alpha = alpha  # 
         self.gamma = gamma
         self.epsilon = epsilon
         self.use_reflection = use_reflection

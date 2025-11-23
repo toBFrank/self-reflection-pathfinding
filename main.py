@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from agents.reflection.epsilon_reflection import EpsilonReflection
-from env.gridworld import GridWorld
+from environment.gridworld import GridWorld
 from agents.q_agent import QAgent
 from experiment.runner import run_experiment
 
@@ -28,10 +28,13 @@ print("Not implemented in this run.")
 
 # Plot learning curves
 plt.figure(figsize=(10, 5))
-plt.plot(baseline_rewards, label="No Reflection")
-plt.plot(reflect_rewards, label="Reflection Enabled")
-plt.title("Learning Curves")
-plt.xlabel("Episode")
+plt.scatter(range(len(baseline_rewards)), baseline_rewards, label="Agent No Reflection", s=10)  # s= marker size
+plt.scatter(range(len(reflect_rewards)), reflect_rewards, label="Agent Reflection Enabled", s=10)
+# plt.plot(baseline_rewards, label="No Reflection")
+# plt.plot(reflect_rewards, label="Reflection Enabled")
+
+plt.title("Reward Trends")
+plt.xlabel("Episodes")
 plt.ylabel("Reward")
 plt.legend()
 plt.show()

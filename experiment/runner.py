@@ -1,4 +1,4 @@
-def run_experiment(env, agent, episodes=1000):
+def run_experiment(env, agent, episodes=100):
     rewards = []
     for ep in range(episodes):
         r, refl = agent.train_episode()
