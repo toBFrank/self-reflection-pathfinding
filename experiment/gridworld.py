@@ -79,7 +79,7 @@ class GridWorld:
             self.grid[pos] = 1
             self.obstacles.append(pos)
 
-    def generate_environment(self, num_obstacles=3):
+    def generate_environment(self, num_obstacles=30):
         self.grid = np.zeros((self.size, self.size))
 
         if not self.set_agent_goal():
