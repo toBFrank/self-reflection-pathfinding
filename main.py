@@ -1,41 +1,98 @@
-import matplotlib.pyplot as plt
-from agents.reflection.epsilon_reflection import EpsilonReflection
+# main.py
+import os
+import numpy as np
 from experiment.gridworld import GridWorld
 from agents.q_agent import QAgent
+from agents.reflection.adaptive_reflection import AdaptiveReflection
+from agents.reflection.epsilon_reflection import EpsilonReflection
+from agents.reflection.reflection_costs import ReflectionCost
 from experiment.runner import run_experiment
 
-# Create environment
-env = GridWorld(size=11, reflect_cost=0.05)
-env.generate_environment(num_obstacles=40)
-env.visualize_grid()
+from analysis.plotting import (
+    plot_reward_over_time,
+    plot_successful_rewards_over_time,
+    plot_reflections_over_time,
+    plot_success_counts,
+)
 
-# Experiment 0: Q-learning, no reflection (Baseline)
-print("Q-Learning, No Reflection (Baseline)")
-baseline_agent = QAgent(env, use_reflection=False)
-baseline_rewards = run_experiment(env, baseline_agent, episodes=10)
+from analysis.tables import (
+    write_summary_md,
+    )
 
-# Experiment 1: Q-learning, epsilon reflection, low cost
-print("\nQ-Learning, Epsilon Reflection, Low Cost ($)")
-reflect_agent = QAgent(env, use_reflection=True, reflection_strategy=EpsilonReflection())
-reflect_rewards = run_experiment(env, reflect_agent, episodes=10)
+# -------------------------------------------------
+# Run a single environment
+# -------------------------------------------------
+def run_agents_on_env(env):
+    results = []
 
-# Experiment 2: Q-learning, epsilon reflection, medium cost
-print("\nQ-Learning, Epsilon Reflection, Medium Cost ($$)")
-print("Not implemented in this run.")
+    # Baseline
+    print("\n=== Running Agent: Baseline ===")
+    base_agent = QAgent(env, use_reflection=False)
+    base_succ, base_rewards, base_refl = run_experiment(env, base_agent)
+    results.append(("Baseline", base_succ, base_rewards, base_refl))
 
-# Experiment 3: Q-learning, epsilon reflection, high cost
-print("\nQ-Learning, Epsilon Reflection, High Cost ($$$)")
-print("Not implemented in this run.")
+    # Adaptive low / medium / high
+    for cost, name, color in [
+        (ReflectionCost.HIGH.value, "Reflection High Cost", "purple"),
+        (ReflectionCost.MEDIUM.value, "Reflection Medium Cost", "red"),
+        (ReflectionCost.LOW.value, "Reflection Low Cost", "green"),
+    ]:
+        print(f"\n=== Running Agent: {name} ===")
+        env.set_reflect_cost(cost)
+        agent = QAgent(env, use_reflection=True, reflection_strategy=AdaptiveReflection())
+        succ, rewards, refl = run_experiment(env, agent)
+        results.append((name, succ, rewards, refl))
 
-# Plot learning curves
-plt.figure(figsize=(10, 5))
-plt.scatter(range(len(baseline_rewards)), baseline_rewards, label="Agent No Reflection", s=10)
-plt.scatter(range(len(reflect_rewards)), reflect_rewards, label="Agent Reflection Enabled", s=10)
-# plt.plot(baseline_rewards, label="No Reflection")
-# plt.plot(reflect_rewards, label="Reflection Enabled")
+    return results
 
-plt.title("Reward Trends")
-plt.xlabel("Episodes")
-plt.ylabel("Reward")
-plt.legend()
-plt.show()
+# -------------------------------------------------
+# Main execution
+# -------------------------------------------------
+if __name__ == "__main__":
+    # Specify where to store results
+    run_name = input("Enter a name for this run (e.g., run_1): ").strip()
+
+    save_dir = os.path.join("results", run_name)
+    os.makedirs(save_dir, exist_ok=True)
+
+    print(f"[INFO] Results will be saved to: {save_dir}")
+
+    # Base environment
+    env = GridWorld(size=20, min_distance=10)
+    env.generate_environment(num_obstacles=100)
+
+    results = run_agents_on_env(env)
+
+    # Produce reward-over-time plot
+    plot_reward_over_time(
+        [(name, rewards, color)
+         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+        save=os.path.join(save_dir, "reward_over_time.png")
+    )
+    
+    # Produce successful rewards over time plot
+    plot_successful_rewards_over_time(
+        [(name, succ, color)
+         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+        save=os.path.join(save_dir, "successful_rewards_over_time.png")
+    )
+
+    # Produce reflection-over-time plot
+    plot_reflections_over_time(
+        [(name, refl, color)
+         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+        save=os.path.join(save_dir, "reflections_over_time.png")
+    )
+
+    # Success counts
+    plot_success_counts(
+        [(name, len(succ), color)
+         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+        save=os.path.join(save_dir, "success_counts.png")
+    )
+
+    # Write summary
+    write_summary_md(
+        results,
+        os.path.join(save_dir, "summary.md")
+    )

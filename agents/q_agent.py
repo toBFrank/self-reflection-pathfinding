@@ -18,7 +18,7 @@ class QAgent:
             reflection_strategy: An instance of a ReflectionStrategy to use when reflecting.
         """
         self.env = env
-        self.alpha = alpha  # 
+        self.alpha = alpha
         self.gamma = gamma
         self.epsilon = epsilon
         self.use_reflection = use_reflection
@@ -35,17 +35,19 @@ class QAgent:
             return np.random.randint(self.n_actions)
         return np.argmax(self.Q[x,y])
 
-    def train_episode(self):
+    def train_episode(self, max_steps=10000):
         self.num_reflections_used = 0
         state = self.env.reset()
         done = False
         total_reward = 0
+        path = [state]
 
-        while not done:
+        for step in range(max_steps):
             x,y = state
             action = self.choose_action(state)
 
             next_state, reward, done = self.env.step(action)
+            path.append(next_state)
             nx,ny = next_state
             total_reward += reward
 
@@ -59,7 +61,14 @@ class QAgent:
                     self.reflection_strategy.reflect(self)
                 self.num_reflections_used += 1
 
+            if done:
+                # print("Reached goal!")
+                break
+
             state = next_state
 
+        if not done:
+            # print("Goal not reached within step limit.")
+            pass
         self.returns.append(total_reward)
-        return total_reward, self.num_reflections_used
+        return total_reward, self.num_reflections_used, path, done

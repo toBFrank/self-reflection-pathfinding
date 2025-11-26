@@ -7,12 +7,12 @@ class EpsilonReflection(ReflectionStrategy):
     If performance gets better, decrease epsilon (less exploration).
     If performance gets worse, increase epsilon (more exploration).
     """
-    def __init__(self, delta=0.02, window=20):
+    def __init__(self, delta=0.02, window=10):
         self.delta = delta
         self.window = window
 
     def reflect(self, agent):
-        if len(agent.returns) < 10:
+        if len(agent.returns) < self.window:
             return
 
         early = np.mean(list(agent.returns)[:5])
