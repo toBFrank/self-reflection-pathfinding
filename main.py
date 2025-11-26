@@ -58,8 +58,8 @@ if __name__ == "__main__":
     print(f"[INFO] Results will be saved to: {save_dir}")
 
     # Base environment
-    env = GridWorld(size=20, min_distance=10)
-    env.generate_environment(num_obstacles=100)
+    env = GridWorld(size=20, min_distance=15)
+    env.generate_environment(num_obstacles=150)
 
     results = run_agents_on_env(env)
 
