@@ -138,12 +138,11 @@ class GridWorld:
         """
 
         old_pos = self.agent_pos
-        old_dist = self.manhattan_distance(old_pos, self.goal_pos)
 
         # reflection action
         if action == self.ACTION_REFLECT:
             # Reflection cost only
-            return old_pos, -0.05 - self.reflect_cost, False
+            return old_pos, -self.reflect_cost, False
 
         x,y = old_pos
         if action == self.ACTION_UP:
@@ -159,7 +158,7 @@ class GridWorld:
 
         # wall or obstacle
         if not (0 <= nx < self.size and 0 <= ny < self.size) or self.grid[nx,ny] == 1:
-            return old_pos, -0.3, False
+            return old_pos, 0, False
 
         # update position
         self.agent_pos = (nx, ny)
@@ -169,13 +168,8 @@ class GridWorld:
         if self.agent_pos == self.goal_pos:
             return self.agent_pos, 10.0, True
 
-        # shaped reward: moving closer or farther
-        if new_dist < old_dist:
-            reward = +0.1
-        elif new_dist > old_dist:
-            reward = -0.1
-        else:
-            reward = -0.05  # neutral step cost
+        # step cost
+        reward = -0.1
 
         return self.agent_pos, reward, False
 

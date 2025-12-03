@@ -35,7 +35,7 @@ class QAgent:
             return np.random.randint(self.n_actions)
         return np.argmax(self.Q[x,y])
 
-    def train_episode(self, max_steps=10000):
+    def train_episode(self, max_steps=1000):
         self.num_reflections_used = 0
         state = self.env.reset()
         done = False
@@ -44,9 +44,12 @@ class QAgent:
 
         for step in range(max_steps):
             x,y = state
-            action = self.choose_action(state)
-
-            next_state, reward, done = self.env.step(action)
+            while True:
+                action = self.choose_action(state)
+                # if the agent hits a wall or obstacle, reward == 0 and it must choose again
+                next_state, reward, done = self.env.step(action)
+                if reward != 0 or action == self.env.ACTION_REFLECT:
+                    break
             path.append(next_state)
             nx,ny = next_state
             total_reward += reward
