@@ -28,7 +28,7 @@ def run_agents_on_env(env):
     # Baseline
     print("\n=== Running Agent: Baseline ===")
     base_agent = QAgent(env, use_reflection=False)
-    base_succ, base_rewards, base_refl = run_experiment(env, base_agent)
+    base_succ, base_rewards, base_refl = run_experiment(env, base_agent, episodes=300)
     results.append(("Baseline", base_succ, base_rewards, base_refl))
 
     # Adaptive low / medium / high
@@ -40,7 +40,7 @@ def run_agents_on_env(env):
         print(f"\n=== Running Agent: {name} ===")
         env.set_reflect_cost(cost)
         agent = QAgent(env, use_reflection=True, reflection_strategy=AdaptiveReflection())
-        succ, rewards, refl = run_experiment(env, agent)
+        succ, rewards, refl = run_experiment(env, agent, episodes=300)
         results.append((name, succ, rewards, refl))
 
     return results
