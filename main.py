@@ -22,7 +22,7 @@ from analysis.tables import (
 # -------------------------------------------------
 # Assess difficulty of environment
 # -------------------------------------------------
-def assess_environment_difficulty(env, num_runs=3, episodes=50):
+def assess_environment_difficulty(env, num_runs=3, episodes=300):
     # run baseline agent on environment 10 times and get average steps to goal
     base_agent = QAgent(env, use_reflection=False)
     successful_episodes = 0
@@ -74,8 +74,8 @@ def run_agents_on_env(env):
 # -------------------------------------------------
 if __name__ == "__main__":
     # Base environment
-    env = GridWorld(size=20, min_distance=20)
-    env.generate_environment(num_obstacles=200)
+    env = GridWorld(size=20, min_distance=15)
+    env.generate_environment(num_obstacles=150)
 
     print("\n=== Assessing Environment Difficulty ===")
     difficulty, avg_success_rate = assess_environment_difficulty(env)
@@ -88,9 +88,6 @@ if __name__ == "__main__":
     os.makedirs(save_dir, exist_ok=True)
 
     print(f"[INFO] Results will be saved to: {save_dir}")
-
-
-
 
     results = run_agents_on_env(env)
 
