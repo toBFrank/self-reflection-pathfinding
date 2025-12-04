@@ -25,7 +25,7 @@ def plot_reward_over_time(results, save=None):
     for name, rewards, color in results:
         # x = range(len(rewards))
         # plt.scatter(x, rewards, alpha=0.3, s=10, label=name, color=color)
-        plt.plot(smooth(rewards), linewidth=2, color=color)
+        plt.plot(smooth(rewards), linewidth=2, color=color, label=name)
 
     plt.title("Reward Over Time")
     plt.xlabel("Episode")
@@ -57,7 +57,7 @@ def plot_successful_rewards_over_time(results, save=None):
     for name, success_rewards, color in results:
         # x = range(len(success_rewards))
         # plt.scatter(x, success_rewards, alpha=0.3, s=10, label=name, color=color)
-        plt.plot(smooth(success_rewards), linewidth=2, color=color)
+        plt.plot(smooth(success_rewards), linewidth=2, color=color, label=name)
 
     plt.title("Successful Episode Rewards Over Time")
     plt.xlabel("Successful Episode Number")
@@ -92,7 +92,7 @@ def plot_reflections_over_time(results, save=None):
     for name, refl, color in results:
         # x = range(len(refl))
         # plt.scatter(x, refl, alpha=0.3, s=10, color=color, label=name)
-        plt.plot(smooth(refl), linewidth=2, color=color)
+        plt.plot(smooth(refl), linewidth=2, color=color, label=name)
 
     plt.title("Reflections Used Over Time")
     plt.xlabel("Episode")
