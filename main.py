@@ -22,8 +22,26 @@ from analysis.tables import (
 # -------------------------------------------------
 # Assess difficulty of environment
 # -------------------------------------------------
-def assess_environment_difficulty(env, num_trials=100):
-    
+def assess_environment_difficulty(env, num_runs=3, episodes=50):
+    # run baseline agent on environment 10 times and get average steps to goal
+    base_agent = QAgent(env, use_reflection=False)
+    successful_episodes = 0
+
+    for _ in range(num_runs):
+        succ, rewards, refl = run_experiment(env, base_agent, episodes=episodes)
+        successful_episodes += len(succ)
+
+    avg_success_rate = successful_episodes / (num_runs * episodes)
+    if avg_success_rate > 0.95:
+        difficulty = "EASY"
+    elif avg_success_rate > 0.25:
+        difficulty = "MEDIUM"
+    else:
+        difficulty = "HARD"
+    print(f"[INFO] Environment assessed as {difficulty} (Success Rate: {avg_success_rate*100:.2f}%)")
+    return difficulty, avg_success_rate
+
+
 
 # -------------------------------------------------
 # Run a single environment
@@ -55,17 +73,24 @@ def run_agents_on_env(env):
 # Main execution
 # -------------------------------------------------
 if __name__ == "__main__":
+    # Base environment
+    env = GridWorld(size=20, min_distance=20)
+    env.generate_environment(num_obstacles=200)
+
+    print("\n=== Assessing Environment Difficulty ===")
+    difficulty, avg_success_rate = assess_environment_difficulty(env)
+    print("=====================================\n")
+
     # Specify where to store results
-    run_name = input("Enter a name for this run (e.g., run_1): ").strip()
+    run_name = input(f"Enter a name for this {difficulty} run (e.g., run_1): ").strip()
 
     save_dir = os.path.join("results", run_name)
     os.makedirs(save_dir, exist_ok=True)
 
     print(f"[INFO] Results will be saved to: {save_dir}")
 
-    # Base environment
-    env = GridWorld(size=20, min_distance=15)
-    env.generate_environment(num_obstacles=150)
+
+
 
     results = run_agents_on_env(env)
 
