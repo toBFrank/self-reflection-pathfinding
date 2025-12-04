@@ -142,7 +142,7 @@ class GridWorld:
         # reflection action
         if action == self.ACTION_REFLECT:
             # Reflection cost only
-            return old_pos, -self.reflect_cost, False
+            return old_pos, 0.05 - self.reflect_cost, False
 
         x,y = old_pos
         if action == self.ACTION_UP:

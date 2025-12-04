@@ -29,13 +29,22 @@ class QAgent:
 
         self.returns = deque(maxlen=20)
 
-    def choose_action(self, state):
+    def choose_action(self, state, invalid_actions=[]):
         x,y = state
+        valid_actions = []
         if np.random.rand() < self.epsilon:
-            return np.random.randint(self.n_actions)
+            for a in range(self.n_actions):
+                if a not in invalid_actions:
+                    valid_actions.append(a)
+            return np.random.choice(valid_actions)
+        # if np.argmax(self.Q[x,y]) in invalid_actions, choose the next best action
+        sorted_actions = np.argsort(self.Q[x,y])[::-1]  # descending order
+        for action in sorted_actions:
+            if action not in invalid_actions:
+                return action
         return np.argmax(self.Q[x,y])
 
-    def train_episode(self, max_steps=1000):
+    def train_episode(self, max_steps=10000):
         self.num_reflections_used = 0
         state = self.env.reset()
         done = False
@@ -44,12 +53,17 @@ class QAgent:
 
         for step in range(max_steps):
             x,y = state
+            invalid_actions = []
             while True:
-                action = self.choose_action(state)
+                action = self.choose_action(state, invalid_actions)
                 # if the agent hits a wall or obstacle, reward == 0 and it must choose again
                 next_state, reward, done = self.env.step(action)
                 if reward != 0 or action == self.env.ACTION_REFLECT:
+                    invalid_actions = []
                     break
+                else:
+                    invalid_actions.append(action)
+        
             path.append(next_state)
             nx,ny = next_state
             total_reward += reward

@@ -20,6 +20,12 @@ from analysis.tables import (
     )
 
 # -------------------------------------------------
+# Assess difficulty of environment
+# -------------------------------------------------
+def assess_environment_difficulty(env, num_trials=100):
+    
+
+# -------------------------------------------------
 # Run a single environment
 # -------------------------------------------------
 def run_agents_on_env(env):
