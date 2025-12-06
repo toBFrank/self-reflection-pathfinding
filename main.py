@@ -1,4 +1,4 @@
-# main.py
+#  main.py
 import os
 import numpy as np
 from experiment.gridworld import GridWorld
@@ -9,6 +9,8 @@ from agents.reflection.reflection_costs import ReflectionCost
 from experiment.runner import run_experiment
 
 from analysis.plotting import (
+    plot_alpha_over_time,
+    plot_epsilon_over_time,
     plot_reward_over_time,
     plot_successful_rewards_over_time,
     plot_reflections_over_time,
@@ -28,7 +30,7 @@ def assess_environment_difficulty(env, num_runs=3, episodes=300):
     successful_episodes = 0
 
     for _ in range(num_runs):
-        succ, rewards, refl = run_experiment(env, base_agent, episodes=episodes)
+        succ, rewards, refl, alphas, epsilons = run_experiment(env, base_agent, episodes=episodes)
         successful_episodes += len(succ)
 
     avg_success_rate = successful_episodes / (num_runs * episodes)
@@ -52,8 +54,8 @@ def run_agents_on_env(env):
     # Baseline
     print("\n=== Running Agent: Baseline ===")
     base_agent = QAgent(env, use_reflection=False)
-    base_succ, base_rewards, base_refl = run_experiment(env, base_agent, episodes=300)
-    results.append(("Baseline", base_succ, base_rewards, base_refl))
+    base_succ, base_rewards, base_refl, base_alphas, base_epsilons = run_experiment(env, base_agent, episodes=300)
+    results.append(("Baseline", base_succ, base_rewards, base_refl, base_alphas, base_epsilons))
 
     # Adaptive low / medium / high
     for cost, name, color in [
@@ -64,8 +66,8 @@ def run_agents_on_env(env):
         print(f"\n=== Running Agent: {name} ===")
         env.set_reflect_cost(cost)
         agent = QAgent(env, use_reflection=True, reflection_strategy=AdaptiveReflection())
-        succ, rewards, refl = run_experiment(env, agent, episodes=300)
-        results.append((name, succ, rewards, refl))
+        succ, rewards, refl, alphas, epsilons = run_experiment(env, agent, episodes=300)
+        results.append((name, succ, rewards, refl, alphas, epsilons))
 
     return results
 
@@ -94,29 +96,41 @@ if __name__ == "__main__":
     # Produce reward-over-time plot
     plot_reward_over_time(
         [(name, rewards, color)
-         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+         for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
         save=os.path.join(save_dir, "reward_over_time.png")
     )
     
     # Produce successful rewards over time plot
     plot_successful_rewards_over_time(
         [(name, succ, color)
-         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+         for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
         save=os.path.join(save_dir, "successful_rewards_over_time.png")
     )
 
     # Produce reflection-over-time plot
     plot_reflections_over_time(
         [(name, refl, color)
-         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+         for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
         save=os.path.join(save_dir, "reflections_over_time.png")
     )
 
     # Success counts
     plot_success_counts(
         [(name, len(succ), color)
-         for (name, succ, rewards, refl), color in zip(results, ["blue","purple","red","green"])],
+         for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
         save=os.path.join(save_dir, "success_counts.png")
+    )
+
+    # Alpha and Epsilon over time plot
+    plot_alpha_over_time(
+        [(name, alphas, epsilons, color)
+         for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
+        save=os.path.join(save_dir, "alpha_over_time.png")
+    )
+    plot_epsilon_over_time(
+        [(name, alphas, epsilons, color)
+         for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
+        save=os.path.join(save_dir, "epsilon_over_time.png")
     )
 
     # Write summary

@@ -5,7 +5,9 @@ import numpy as np
 def smooth(y, window=20):
     if len(y) < window:
         return y
-    return np.convolve(y, np.ones(window)/window, mode='same')
+    gaussian = np.exp(-np.linspace(-2, 2, window)**2)
+    gaussian /= gaussian.sum()
+    return np.convolve(y, gaussian, mode='same')
 
 
 # -------------------------------------------------
@@ -120,6 +122,44 @@ def plot_success_counts(success_stats, save=None):
     plt.title("Successful Episodes")
     plt.ylabel("Count")
     plt.xticks(rotation=30)
+
+    if save:
+        plt.savefig(save)
+    plt.show()
+
+# -------------------------------------------------
+# Alpha Over Time
+# -------------------------------------------------
+def plot_alpha_over_time(results, save=None):
+    plt.figure(figsize=(10,5))
+
+    for name, alphas, epsilons, color in results:
+        plt.plot(smooth(alphas), label=f"{name} - Alpha", color=color)
+
+
+    plt.xlabel("Episode")
+    plt.ylabel("Value")
+    plt.title("Alpha Over Time")
+    plt.legend()
+
+    if save:
+        plt.savefig(save)
+    plt.show()
+
+# -------------------------------------------------
+# Epsilon Over Time
+# -------------------------------------------------
+def plot_epsilon_over_time(results, save=None):
+    plt.figure(figsize=(10,5))
+
+    for name, alphas, epsilons, color in results:
+        plt.plot(smooth(epsilons), label=f"{name} - Epsilon", color=color)
+
+
+    plt.xlabel("Episode")
+    plt.ylabel("Value")
+    plt.title("Epsilon Over Time")
+    plt.legend()
 
     if save:
         plt.savefig(save)

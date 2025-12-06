@@ -14,7 +14,7 @@ def write_summary_md(results, save_path):
     summary = []
 
     # Collect stats
-    for name, success, rewards, refl in results:
+    for name, success, rewards, refl, alphas, epsilons in results:
         avg_reward = np.mean(rewards)
         avg_success_reward = np.mean(success) if len(success) > 0 else 0
         successes = len(success)

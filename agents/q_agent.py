@@ -24,6 +24,9 @@ class QAgent:
         self.use_reflection = use_reflection
         self.reflection_strategy = reflection_strategy
 
+        self.alphas = [self.alpha]
+        self.epsilons = [self.epsilon]
+
         self.n_actions = 5 if use_reflection else 4
         self.Q = np.zeros((env.size, env.size, self.n_actions))
 
@@ -59,11 +62,11 @@ class QAgent:
                 # if the agent hits a wall or obstacle, reward == 0 and it must choose again
                 next_state, reward, done = self.env.step(action)
                 if reward != 0 or action == self.env.ACTION_REFLECT:
-                    invalid_actions = []
                     break
                 else:
                     invalid_actions.append(action)
         
+            invalid_actions = []
             path.append(next_state)
             nx,ny = next_state
             total_reward += reward
@@ -88,4 +91,6 @@ class QAgent:
             # print("Goal not reached within step limit.")
             pass
         self.returns.append(total_reward)
-        return total_reward, self.num_reflections_used, path, done
+        self.alphas.append(self.alpha)
+        self.epsilons.append(self.epsilon)
+        return total_reward, self.num_reflections_used, path, done, self.alphas, self.epsilons

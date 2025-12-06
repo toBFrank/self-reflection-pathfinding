@@ -8,7 +8,7 @@ def run_experiment(env, agent, episodes=100):
 
     for ep in range(episodes):
         # print(f"\nEpisode {ep + 1}: ", end="")
-        r, refl, path, is_successful = agent.train_episode()
+        r, refl, path, is_successful, alphas, epsilons = agent.train_episode()
         if is_successful:
             successful_rewards.append(r)
         rewards.append(r)
@@ -27,4 +27,4 @@ def run_experiment(env, agent, episodes=100):
         env.plot_path(best_path)
     else:
         print("Failed.")
-    return successful_rewards, rewards, reflections
+    return successful_rewards, rewards, reflections, alphas, epsilons
