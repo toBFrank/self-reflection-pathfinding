@@ -1,0 +1,236 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{authblk}
+
+% Command used to flag places where the authors must insert a real
+% measured value from their experiment logs. Search for "FILLIN" to
+% find every remaining placeholder before submission.
+\newcommand{\fillin}[1]{\textcolor{red}{\texttt{[FILLIN: #1]}}}
+
+\title{The Role of Self-Reflection in Reinforcement Learning Agents}
+\author[1]{Dhruv Amin}
+\author[1]{Franco Bonilla}
+\author[1]{Arnav Chandra}
+\author[1]{Dev Desai}
+\author[1]{Xinbei Miao}
+\author[1]{Myla Yambao}
+\author[1]{Nolan Zurek}
+\affil[1]{Department of Computing Science, University of Alberta, Edmonton, Alberta, T6G 2E8, Canada}
+\date{December 5, 2025}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Self-reflection is the ability of an agent to consider its past actions or aspects of its own policy when making decisions. In this paper, we narrow that broad notion to a single operational form: an agent's ability to pause and adjust its own learning parameters based on a summary of its recent performance. We model this narrow form of reflection as an explicit action available to a tabular Q-learning agent. When the agent selects the reflect action, the environment state remains unchanged, a reflection cost is subtracted from the reward at that step, and the agent's exploration rate ($\epsilon$) and learning rate ($\alpha$) are updated based on recent performance. This approach incorporates the cost of reflection directly into the Markov Decision Process, facilitating controlled comparisons between a standard Q-learning baseline and reflective agents subjected to varying reflection costs. A $20\times20$ GridWorld navigation task is used to evaluate episodic return and reflection frequency, identifying conditions under which reflection enhances learning efficiency and examining how reflection cost affects the agent's willingness to reflect.
+\end{abstract}
+
+\section{Introduction}
+
+Reinforcement learning (RL) studies how an agent can learn to behave optimally through trial and error by maximizing expected cumulative reward in an environment. In standard RL, the agent interacts with the environment over a sequence of states, selects actions, receives rewards, and updates its policy accordingly. This project investigates the role of self-reflection in a controlled RL setting. In our formulation, reflection is modeled as an explicit action available to the agent. When the agent executes the reflect action, the environment state does not change; instead, the agent performs an internal update that modifies its learning parameters and incurs an immediate cost, which is subtracted from the reward. This penalty represents the cost of allocating a decision step to introspection rather than to environmental interaction, creating a direct trade-off between immediate and potential long-term benefit.
+
+\paragraph{What we mean by ``reflection'' here, and what we do not.} It is worth being precise about scope, since ``self-reflection'' is used loosely elsewhere in the literature (Section~3). Every Q-learning agent, reflective or not, updates its value table after each transition using the standard temporal-difference rule; we do \emph{not} call this update ``introspection,'' because it is not a discretionary choice -- it happens automatically after every step regardless of what the agent selects. What we call reflection is narrower and different in kind: it is a discrete, \emph{optional} action that an agent can select \emph{instead of} moving. Choosing it forgoes a step of environmental progress and, in exchange, triggers a meta-level update that changes \emph{how} the agent will learn and explore going forward (its $\epsilon$ and $\alpha$ values), rather than changing what it currently believes about any specific state-action value. This is why only the reflect action carries an explicit cost in our formulation: the cost is not meant to represent the computational expense of an update rule (both the ordinary TD update and the reflect update involve trivial arithmetic on two or three scalars); it is meant to represent the \emph{opportunity cost} of spending a limited decision step on a non-movement action instead of making progress toward the goal. Framed this way, reflection in this paper is best understood as a lightweight form of \emph{online meta-parameter adaptation} gated behind an action-selection cost, not a general capacity for the agent to reason about or explain its own policy. We adopt this narrow, tractable definition deliberately so that its costs and benefits can be measured precisely; Section~7 discusses richer notions of reflection we leave to future work.
+
+Our goal is to determine whether introducing this reflection action leads to a net improvement in learning outcomes relative to a standard tabular Q-learning baseline. To isolate the impact of reflection, we compare two agents that are identical except for the availability and use of the reflect action. The baseline agent applies tabular Q-learning with an $\epsilon$-greedy exploration strategy and fixed learning parameters, whereas the reflective agent may choose to reflect; upon reflecting, it adjusts internal parameters based on recent performance. We evaluate the reflective agent under varying reflection costs in a GridWorld environment, measuring episodic return and reflection frequency. These metrics directly address two key questions: under what conditions does self-reflection improve performance despite its cost, and how does the cost of reflection influence the agent's decision to reflect. We hypothesize that in environments where standard movement actions are sufficient to learn an effective policy, reflection may impose an unnecessary penalty. In contrast, in settings where learning is unstable or requires adjustment, reflection may improve performance by guiding exploration and learning-rate adaptation.
+
+\section{Problem Formulation}
+
+We frame the agent's interaction with the environment as a finite, episodic Markov Decision Process (MDP)
+\[
+M = (S, A, P, R, \gamma)
+\]
+where $S$ denotes the finite state space, $A$ the set of available actions, $P(s' = s \mid s,a)$ the transition dynamics, $R(s,a,s')$ the reward function, and $\gamma \in [0,1)$ the discount factor. Although the task is finite-horizon, we still use $\gamma < 1$ rather than $\gamma = 1$: this keeps returns bounded even under the step cap used in our experiments (Section~5), and it gives the agent a mild built-in preference for reaching the goal sooner rather than later, which is standard practice in tabular Q-learning implementations even when it is not strictly required by the finite horizon. The agent seeks to learn a policy $\pi(a\mid s)$ that maximizes the expected return over an episode.
+
+To incorporate self-reflection into this MDP, we extend the action set to
+\[
+A = \{\text{up}, \text{down}, \text{left}, \text{right}, \text{reflect}\}.
+\]
+
+The transition and reward functions must be defined for every action, including reflect, so we state both completely. Transitions are deterministic:
+\[
+P(s' \mid s, a) =
+\begin{cases}
+1, & a \in \{\text{up},\text{down},\text{left},\text{right}\},\ s' = \text{result of moving from } s \text{ in direction } a\text{ (or } s' = s \text{ if blocked/off-grid)},\\
+1, & a = \text{reflect},\ s' = s.
+\end{cases}
+\]
+The reward function is likewise defined for every action and every resulting state:
+\[
+R(s,a,s') =
+\begin{cases}
++10, & a \in \{\text{up},\text{down},\text{left},\text{right}\} \text{ and } s' = s_{\text{goal}},\\
+-0.1, & a \in \{\text{up},\text{down},\text{left},\text{right}\} \text{ and } s' \neq s_{\text{goal}},\\
+-c, & a = \text{reflect} \quad (\text{so } s' = s \text{ always}),
+\end{cases}
+\]
+where $c \geq 0$ is a fixed scalar reflection cost. In other words, $\forall s, s'$: $R(s,\text{reflect},s') = -c$. Choosing to reflect replaces the usual per-step movement cost with the reflection cost -- it does not stack on top of it -- since the agent does not attempt to move on a reflection step.
+
+Let $G_{\text{reflect}}$ denote the episodic return of a reflective agent and $G_{\text{baseline}}$ the return of the baseline agent, without the ability to reflect. We want to determine under what conditions
+\[
+\mathbb{E}[G_{\text{reflect}}] > \mathbb{E}[G_{\text{baseline}}],
+\]
+and how the reflection cost $c$ influences this relationship. Because $\mathbb{E}[G]$ cannot be computed in closed form for this MDP, we estimate it empirically: throughout Section~5, the average episodic return over the evaluation episodes for a given agent and map difficulty is reported as our empirical estimator $\hat{G}$ of $\mathbb{E}[G]$, and comparisons between agents are made on this quantity. We hypothesize that when the transition and reward structure allows the agent to improve its return through selecting movement actions alone, reflection may impose an unnecessary cost. In contrast, environments that demand greater adaptation may benefit from reflection.
+
+\section{Related Work}
+
+In general, we found that definitions of reflection and self-reflection were not standardized. As such, much of the related work was consulted to learn about different formulations of reflection and how these formulations were evaluated. Much of this work seeks to solve problems that are not directly related to ours. In particular, a large part of the related work involved studying various notions of reflection in large language models.
+
+Cox (2005) broadly surveys the field of metacognition and proposes various definitions for reflection. However, they do not formalize the cost of reflection as it relates to selecting actions, and reflection is implicitly assumed to always be beneficial to cognitive systems; this assumption is not tested empirically.
+
+Omidshafiei et al. (2018) allow agents to learn when and what advice to give to peers to accelerate group learning. Under their formulation, a teacher agent is allowed to send advice signals to student agents in a multi-agent reinforcement-learning setting. The study shows that judicious teaching leads to a significant speedup in cooperative learning. However, the formulation treats advice as an arbitrary signal rather than a self-articulation of an agent's own policy. A cost for giving or receiving advice is not modeled, and the formulation assumes advice is generally beneficial without analyzing the possible performance decrease from receiving badly formulated or misguided advice.
+
+Renze and Guven (2024) examine the impact of learning from past traces on the problem-solving performance of large language model agents. By comparing baseline prompts with reflection-enabled prompts across a range of reasoning tasks, they show that reflection often increases accuracy and helps detect mistakes in single-episode reasoning. However, this work is limited to online or single-agent language tasks and does not address sequential decision making with explicit episodic returns. In addition, they do not explicitly model a cost for producing reflections, such as a computational, time, or energy penalty, and they do not explore how self-reflection may influence other agents or propagate errors in a multi-agent setting.
+
+Zhang et al. (2024) propose using reflection as a mechanism to adjust the internal policy components of LLMs to improve performance after failure. Under their formulation, an LLM agent articulates beliefs about the world and itself in natural language based on external performance feedback and its previous beliefs, and these articulations are included as part of the subsequent prompt -- acting as a natural-language extension of the agent's policy. Thus, the agent considers aspects of its own policy as part of reflection. However, their model does not assign a cost to reflection, nor does it explore when reflection may degrade performance.
+
+Taken together, these lines of research show that various forms of self-reflection or advice can improve performance, but most research in this area does not address the cost-benefit trade-offs and fidelity of choosing to self-reflect. We note that our own formulation, like Omidshafiei et al.'s, does not have the agent articulate or interpret its own policy in any explicit sense either -- our ``reflection'' is a numeric parameter update, not a self-articulation as in Zhang et al. We view closing this gap, i.e., combining an explicit, costed reflection action with a genuine self-articulation of policy, as an open problem that we return to in Section~7.
+
+\section{Proposed Approach}
+
+Our aim is to determine whether adding an explicit reflection action to a standard reinforcement-learning agent improves learning efficiency despite its immediate cost. Following the problem formulation in Section~2, we structure the experiments to isolate reflection cost as the only differing component between agents, and use a clearly defined baseline for comparison. We extend a tabular Q-learning agent with a reflect action that leaves the environment state unchanged but modifies the agent's internal learning parameters while incurring a fixed penalty. This formulation allows us to evaluate whether the benefit produced by reflection outweighs its immediate cost. Concrete numerical settings (learning rate, discount factor, cost levels, number of episodes, etc.) are deferred to Section~5, where all empirical evaluation parameters are collected in one place; this section describes only the algorithmic mechanism.
+
+\subsection{Baseline Agent}
+
+The baseline agent is a standard tabular Q-learning agent with an $\epsilon$-greedy exploration strategy. It receives no other guidance or heuristics: exploration and learning-rate parameters are fixed for the duration of training. The baseline agent updates its action-value estimates using the standard Q-learning rule
+\[
+Q(s,a) \leftarrow Q(s,a) + \alpha\big[r + \gamma \max_{a'} Q(s',a') - Q(s,a)\big],
+\]
+where $r$ is the reward obtained after executing action $a$ in state $s$, i.e. $r = R(s,a,s')$ as defined in Section~2. This update rule is applied after every transition for both the baseline and reflective agents; it is what we mean by ordinary Q-learning, and it is distinct from -- and unaffected in form by -- the reflection mechanism described next.
+
+\subsection{Reflective Agent}
+
+The reflective agent is identical to the baseline in its use of tabular Q-learning, with the exception that it may choose an additional reflect action. Executing the reflect action leaves the environment unchanged and yields the reward $R(s,\text{reflect},s') = -c$ defined in Section~2, where $c \geq 0$ is the reflection cost. We evaluate three cost levels, $c \in \{0.1, 0.2, 0.3\}$, to examine whether the cost of the reflection action influences the agent's decision to reflect.
+
+Upon reflecting, the agent updates its internal learning parameters -- specifically the exploration rate $\epsilon$ and the learning rate $\alpha$ -- based on a simple recent-performance comparison: it compares the average reward over its most recent five actions with the average reward over the preceding five actions.
+\begin{itemize}
+\item If performance has improved, $\epsilon$ is decreased by $0.02$ (floored at $0.01$) and $\alpha$ is increased by $0.02$ (capped at $1$), promoting more exploitative behavior and placing greater weight on new information.
+\item If performance has deteriorated, $\epsilon$ is increased and $\alpha$ is decreased by the same increment (subject to the same bounds), allowing for more exploration while reducing the influence of potentially misleading rewards.
+\end{itemize}
+The step size ($0.02$) and the bounds on $\epsilon$ and $\alpha$ were chosen heuristically, to produce a modest, incremental adjustment per reflection rather than an abrupt change; we did not perform a systematic sweep over these constants. We flag this as a limitation in Section~7, since the results in Section~5 could plausibly be sensitive to this choice.
+
+\subsection{GridWorld Environment}
+
+The experiments are conducted in a $20\times20$ GridWorld environment in which start and goal positions, as well as obstacle placements, are randomly generated to produce different maps. To generate variation in navigational complexity, we construct maps with three structural configurations: 100 obstacles with a minimum start--goal distance of 10, 150 obstacles with a minimum distance of 15, and 200 obstacles with a minimum distance of 20. We classify maps into difficulty tiers based on the \emph{baseline} agent's performance on that map, so that difficulty is defined behaviorally rather than purely structurally: for each map configuration, the baseline agent is trained for three independent runs, and the resulting success rates are averaged to obtain a performance measure $x$. Maps for which the baseline achieves $x \geq 95\%$ are labeled \emph{easy}, those with $25\% \leq x < 95\%$ are labeled \emph{medium}, and those with $x < 25\%$ are labeled \emph{hard} (Table~1). These two thresholds (95\% and 25\%) were chosen to produce a roughly even spread of maps across the three tiers given our obstacle configurations, rather than tuned against any external criterion; we did not test how the downstream results in Section~5 would change under different threshold choices, and we note this as a limitation in Section~7.
+
+\begin{table}[h]
+\centering
+\caption{Difficulty classification criteria, based on the baseline agent's average success rate $x$ across three runs on a given map configuration.}
+\begin{tabular}{lll}
+\toprule
+Tier & Baseline success rate & Obstacle configuration \\
+\midrule
+Easy & $x \geq 95\%$ & 100 obstacles, min. start--goal distance 10 \\
+Medium & $25\% \leq x < 95\%$ & 150 obstacles, min. start--goal distance 15 \\
+Hard & $x < 25\%$ & 200 obstacles, min. start--goal distance 20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\section{Empirical Evaluation}
+
+We evaluate whether the reflect action improves Q-learning performance on GridWorld pathfinding, and specifically whether the benefit of adaptive exploration/exploitation parameters outweighs the cost of reflection and its associated missed movement opportunities. We report reflection frequency, $\alpha$ and $\epsilon$ over time, episodic return, and success rate for each agent, across environments of varying difficulty.
+
+\subsection{Experimental Setup}
+
+All empirical evaluation parameters are collected here. The baseline agent uses learning rate $\alpha = 0.3$ and discount factor $\gamma = 0.95$, both fixed for the duration of training. We train three reflective agents, one per reflection-cost level ($c \in \{0.1, 0.2, 0.3\}$), and the baseline agent on identical sequences of GridWorld environments (Section~4.3). All agents share the same transition dynamics: movement actions advance the agent deterministically unless blocked by an obstacle, each movement step incurs a reward of $-0.1$, reaching the goal yields a terminal reward of $+10$, and reflecting costs $-c$ (Section~2). Each agent is trained for $1000$ episodes per map, with a maximum of $10{,}000$ steps per episode as a safety cap against non-terminating episodes. Throughout training, we record the episodic return achieved by each agent, the number of times the agent chooses the reflect action, and whether each episode reached the goal (success). These metrics are collected across all three map difficulty levels.
+
+\emph{Note on the baseline agent:} the baseline is not a reflective agent and has no $\epsilon$/$\alpha$/reflection-count trajectory to report, so its performance is given only as a summary statistic. Its return and success-rate performance is reported numerically in Table~2, alongside the reflective agents, for direct comparison.
+
+\begin{table}[h]
+\centering
+\caption{Mean episodic return and success rate by agent and map difficulty, averaged over the final 100 training episodes. \fillin{insert measured values from experiment logs for all cells below}.}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{2}{c}{Easy} & \multicolumn{2}{c}{Medium} & \multicolumn{2}{c}{Hard} \\
+Agent & Return & Success \% & Return & Success \% & Return & Success \% \\
+\midrule
+Baseline & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} \\
+Low cost ($c=0.1$) & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} \\
+Medium cost ($c=0.2$) & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} \\
+High cost ($c=0.3$) & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} & \fillin{val} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Performance by Difficulty Level}
+
+\subsubsection{Easy Maps}
+
+In easy environments, reflection provided no measurable benefit. The low-cost reflective agent reflected most often, the medium-cost agent reflected moderately, and the high-cost agent rarely chose to reflect. The baseline and high-cost agents obtained the highest success rates and the most favorable episodic returns, with the medium-cost agent performing similarly but not better than the baseline. The low-cost agent, despite frequent early reflection, achieved the lowest episodic returns, indicating that the combined cost of reflecting and the movement opportunities it forwent outweighed any learning advantage. All reflective agents learned over time to reduce their frequency of reflection, but this reduction did not translate into improvements over the baseline. These results suggest that in environments that are already easily solvable with fixed parameters, reflection introduces unnecessary cost without providing strategic insight that improves learning outcomes.
+
+
+
+
+\subsubsection{Medium Maps}
+
+In medium environments, the benefits of reflection began to show, but the pattern differed across cost levels. The low-cost reflective agent stopped reflecting earlier than the medium- and high-cost agents, while the high-cost agent continued reflecting throughout training, likely because the larger per-reflection adjustment to $\epsilon$ and $\alpha$ made its parameters harder to stabilize. Both the low- and medium-cost agents achieved successful episodes, in contrast to the baseline agent, which did not solve the task within the allotted steps with any consistency. These results suggest that reflection can help overcome tasks with sparse and delayed rewards, though an excessive cost may prevent the agent from escaping suboptimal behavior once reflection itself is repeatedly punished.
+
+
+
+
+\subsubsection{Hard Maps}
+
+Reflection demonstrated its greatest utility in high-difficulty environments. Both the low- and medium-cost agents achieved the highest success rates and episodic returns, substantially outperforming the baseline agent, which failed to reliably complete the task within the training horizon. The low-cost agent reflected frequently in the early episodes but gradually reduced reflection once a reliable path to the goal was discovered, leading to consistently higher returns. The medium-cost agent followed a similar pattern with fewer total reflections. We attribute the baseline's difficulty here to the combination of a sparse terminal reward and fixed, undifferentiated exploration: with $\epsilon$ and $\alpha$ held constant, $\epsilon$-greedy exploration in a $20\times20$ grid with 200 obstacles can spend a large fraction of the training horizon on unproductive exploration before enough goal-reaching trajectories accumulate to shape the value table. The reflective agents' ability to shift toward more exploitative settings once early progress is detected -- and back toward exploration when it stalls -- appears to shorten this search, which is consistent with reflection speeding up convergence in maps that are not trivial to solve.
+
+
+
+
+\subsubsection{Summary}
+
+Across map difficulties, reflection demonstrates value only when the environment is sufficiently complex to require more than fixed, undifferentiated exploration. In easy environments, reflection offers no benefit: the agent's fixed-parameter baseline is already close to optimal, so any step spent reflecting is a step wasted, and performance decreases when reflection incurs an avoidable cost. In medium and hard environments, reflection improves learning by letting agents increase or decrease their exploration and learning rate to find a solution path, leading to higher rewards and successful episodes that the baseline agent rarely achieves in the same number of training episodes. Adjusting $\alpha$ and $\epsilon$ in response to a recent-performance signal appears to speed convergence toward a workable policy in these harder settings by shortening the period of undirected exploration.
+
+\section{Discussion}
+
+We have established a functioning single-agent GridWorld environment in which reflection is an additional action incurring a cost, and evaluated it against a matched non-reflective baseline. Within the narrow definition of reflection introduced in Section~1 -- a costed, discrete action that adjusts $\epsilon$ and $\alpha$ based on a recent-performance comparison -- the results in Section~5 show that this mechanism is not universally helpful: it is neutral-to-harmful on easy maps and beneficial on medium and hard maps, where fixed exploration/exploitation parameters are a poor fit for the task.
+
+It is worth being explicit about what this does and does not show. The reflective agent does not evaluate or explain \emph{why} its performance changed, nor does it consider structural features of the map; it only compares two rolling averages of reward and nudges two scalars accordingly. This is a much thinner mechanism than the self-articulation of policy performed by, e.g., Zhang et al. (2024) (Section~3), and we do not claim it constitutes reflection in that richer sense. What our results do show is that even this thin, purely numeric form of meta-parameter adaptation -- when it is made costly and discretionary rather than free and automatic -- can produce a net improvement over a fixed-parameter baseline in sufficiently difficult environments, and a net loss in easy ones. That cost-sensitivity, rather than the sophistication of the reflection mechanism itself, is the main finding of this work.
+
+Adding reflection as an explicit action is compatible with standard reinforcement-learning formulations and provides a flexible framework for extending to meta-learning experiments, by which we mean experiments where an agent adapts its own learning-algorithm parameters (here, $\epsilon$ and $\alpha$) using a signal derived from its own recent performance, rather than having those parameters fixed in advance by the experimenter. We view the results in Section~5 as an early, single-mechanism proof of concept for that framework rather than a general claim about self-reflection in RL agents.
+
+\section{Shortcomings \& Future Work}
+
+\subsection{Shortcomings}
+
+The reflection mechanism is narrowly defined: it only adjusts $\epsilon$ and $\alpha$ after a two-window performance comparison, a change that summarizes very little about past behavior. Under this formulation, the only modeled downside to reflecting is the explicit reflection cost $c$; there is no additional risk or long-term consequence tied to reflecting badly, which limits how strategic the agent's use of the action can become.
+
+The use of tabular Q-learning and coordinate-based state representations also limits both task complexity and the agent's capacity to generalize: because states encode only positions rather than structural features of the environment (e.g., local obstacle density), the agent cannot transfer what a successful reflection revealed in one region of the map to similar situations elsewhere. Our hard-map results (Section~5.1.3) show that reflection is most useful \emph{before} a reliable path has been found, since that is when the low- and medium-cost agents reflect most and the returns climb fastest; reflection frequency then decays as training progresses. We do not, however, observe reflection becoming strictly redundant once a path is found -- the low-cost agent continues to reflect occasionally throughout training -- so we state this more cautiously than an earlier draft of this section did: reflection's marginal value appears to shrink, but not vanish, once the agent has located a workable policy, and confirming this trend would require tracking per-episode path quality rather than only aggregate return.
+
+\subsection{Future Work}
+
+A key area of exploration would be to formulate and adopt a more robust model of reflection, in particular one where agents articulate and interpret aspects of their own policy in addition to their past actions, in the spirit of Zhang et al. (2024). This would move our formulation closer to the richer definitions surveyed in Section~3.
+
+This project could also be expanded to include multiple agents instead of just one, each with its own learning process and reflection steps while sharing the same environment. Agents could cooperate or compete while learning, which raises a form of \emph{shared} reflection distinct from what we study here: rather than an agent simply choosing \emph{whether} to reflect on its own trajectory (which our current single-agent formulation already supports), a multi-agent extension would let an agent choose whether to disclose the outcome of its reflection to other agents, or keep it private -- effectively adding a communication decision on top of the reflection decision we already model. Studying how reflection propagates, or fails to propagate, between agents under this extension would better capture the trade-offs described by Omidshafiei et al. (2018) for advice-sharing, but with an explicit cost model attached.
+
+\section{Conclusions}
+
+This project investigated whether adding an explicit reflect action to a standard reinforcement-learning agent can improve performance despite an immediate cost. We compared a baseline tabular Q-learning agent that can only take movement actions (up, down, left, right) to a reflective variant that can additionally choose to reflect. When the agent reflects, the environment state remains unchanged, the agent receives an immediate penalty $c$, and the agent adjusts its internal learning behavior by updating the exploration rate $\epsilon$ and learning rate $\alpha$ using a recent-performance comparison.
+
+Across experiments in GridWorld, we evaluated episodic return and reflection frequency under multiple reflection-cost settings. The results indicate that reflection is not universally beneficial: it is unnecessary and mildly harmful on easy maps, where a fixed-parameter baseline is already close to optimal, and it is beneficial on medium and hard maps, where the baseline's fixed exploration/exploitation trade-off struggles to find a solution within the training horizon. As the reflection cost increases, the agent reflects less often, so the adaptive benefit of reflecting must be large enough to offset a larger per-use penalty; at the lowest cost level tested ($c=0.1$), reflection was cheap enough to be used freely, but this frequent use only paid off in the harder map tiers -- on easy maps, the same low cost was enough to make reflection a net loss purely from the missed movement opportunities it caused. In short, the value of reflection in this formulation depends jointly on task difficulty \emph{and} reflection cost, rather than on either alone.
+
+Confirming and extending these findings would benefit from an ablation in which the reflect action incurs the same cost $c$ but does \emph{not} modify $\epsilon$ or $\alpha$ (a ``pay the cost, learn nothing'' control). Such a control would isolate how much of the reflective agents' advantage in medium/hard maps comes from the parameter updates themselves, as opposed to, e.g., the reflective agents happening to pause in place at moments that are incidentally useful. We did not run this ablation in the present work and flag it as the most direct next step. Overall, this work supports the view that self-reflection, at least in the narrow, costed form studied here, is best understood as a cost-sensitive mechanism whose benefit is concentrated in environments that are hard enough to need adaptive exploration, and whose benefit can disappear entirely in environments that do not.
+
+\section*{Acknowledgments}
+We used AI assistance (specifically ChatGPT) to help check grammar and improve sentence structure in this document.
+
+\begin{thebibliography}{9}
+
+\bibitem{cox2005}
+Cox, M.~T. (2005). Metacognition in computation: A selected history. In \emph{Proceedings of the AAAI Spring Symposium on Metacognition in Computation}, Cambridge, MA. AAAI Press.
+
+\bibitem{omidshafiei2018}
+Omidshafiei, S., Kim, D.-K., Liu, M., Tesauro, G., Riemer, M., Amato, C., Campbell, M., and How, J.~P. (2018). Learning to teach in cooperative multiagent reinforcement learning. \emph{arXiv preprint arXiv:1805.07830}.
+
+\bibitem{renze2024}
+Renze, M. and Guven, E. (2024). Self-reflection in LLM agents: Effects on problem-solving performance. \emph{arXiv preprint arXiv:2405.06682}.
+
+\bibitem{zhang2024}
+Zhang, W., Tang, K., Wu, H., Wang, M., Shen, Y., Hou, G., Tan, Z., Li, P., Zhuang, Y., and Lu, W. (2024). Agent-Pro: Learning to evolve via policy-level reflection and optimization. In \emph{Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pages 5348--5375, Bangkok, Thailand. Association for Computational Linguistics. \emph{arXiv preprint arXiv:2402.17574}.
+
+\end{thebibliography}
+
+\end{document}
