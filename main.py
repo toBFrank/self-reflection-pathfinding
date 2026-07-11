@@ -1,12 +1,13 @@
 #  main.py
 import os
+import sys
 import numpy as np
 from experiment.gridworld import GridWorld
 from agents.q_agent import QAgent
 from agents.reflection.adaptive_reflection import AdaptiveReflection
 from agents.reflection.epsilon_reflection import EpsilonReflection
 from agents.reflection.reflection_costs import ReflectionCost
-from experiment.runner import run_experiment
+from experiment.runner import run_experiment, run_experiment_with_paths
 
 from analysis.plotting import (
     plot_alpha_over_time,
@@ -15,6 +16,7 @@ from analysis.plotting import (
     plot_successful_rewards_over_time,
     plot_reflections_over_time,
     plot_success_counts,
+    plot_path_evolution_video,
 )
 
 from analysis.tables import (
@@ -24,7 +26,7 @@ from analysis.tables import (
 # -------------------------------------------------
 # Assess difficulty of environment
 # -------------------------------------------------
-def assess_environment_difficulty(env, num_runs=3, episodes=300):
+def assess_environment_difficulty(env, num_runs=3, episodes=20):
     # run baseline agent on environment 10 times and get average steps to goal
     base_agent = QAgent(env, use_reflection=False)
     successful_episodes = 0
@@ -77,14 +79,17 @@ def run_agents_on_env(env):
 if __name__ == "__main__":
     # Base environment
     env = GridWorld(size=20, min_distance=15)
-    env.generate_environment(num_obstacles=150)
+    env.generate_environment(num_obstacles=50)
 
     print("\n=== Assessing Environment Difficulty ===")
     difficulty, avg_success_rate = assess_environment_difficulty(env)
     print("=====================================\n")
 
     # Specify where to store results
-    run_name = input(f"Enter a name for this {difficulty} run (e.g., run_1): ").strip()
+    raw_run_name = input(f"Enter a name for this {difficulty} run (e.g., run_1): ").strip() if sys.stdin.isatty() else ""
+    run_name = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in raw_run_name).strip("._")
+    if not run_name:
+        run_name = "default_run"
 
     save_dir = os.path.join("results", run_name)
     os.makedirs(save_dir, exist_ok=True)
@@ -131,6 +136,16 @@ if __name__ == "__main__":
         [(name, alphas, epsilons, color)
          for (name, succ, rewards, refl, alphas, epsilons), color in zip(results, ["blue","purple","red","green"])],
         save=os.path.join(save_dir, "epsilon_over_time.png")
+    )
+
+    # Create a video of the agent improving over successful runs
+    env.set_reflect_cost(ReflectionCost.LOW.value)
+    video_agent = QAgent(env, use_reflection=True, reflection_strategy=AdaptiveReflection())
+    _, _, _, _, _, _, _, successful_paths = run_experiment_with_paths(env, video_agent, episodes=80)
+    plot_path_evolution_video(
+        env,
+        successful_paths,
+        save=os.path.join(save_dir, "path_evolution.gif")
     )
 
     # Write summary
